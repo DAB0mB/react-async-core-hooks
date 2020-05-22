@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 const createAsyncEffectHook = (useEffect) => (fn, input) => {
-  const changedRef = useRef();
   const cbQueueRef = useRef([]);
   const [result, setResult] = useState(null);
   const [iterator, setIterator] = useState(null);
@@ -33,21 +32,7 @@ const createAsyncEffectHook = (useEffect) => (fn, input) => {
   }, [result]);
 
   useEffect(() => {
-    if (typeof changedRef.current != 'undefined') {
-      changedRef.current = true;
-    }
-  }, input);
-
-  useEffect(() => {
-    changedRef.current = typeof changedRef.current == 'undefined';
-  }, [result, iterator]);
-
-  useEffect(() => {
-    if (!changedRef.current) return;
-
-    changedRef.current = false;
     cbQueueRef.current = [];
-    setResult(null);
 
     const iterator = fn(onCleanup);
 
@@ -55,7 +40,7 @@ const createAsyncEffectHook = (useEffect) => (fn, input) => {
     setResult(iterator.next());
 
     return cleanup;
-  });
+  }, input);
 
   useEffect(() => {
     if (!result) return;
@@ -72,11 +57,10 @@ const createAsyncEffectHook = (useEffect) => (fn, input) => {
           throwback(error);
         }
       });
-
-      return;
     }
-
-    next(result.value);
+    else {
+      next(result.value);
+    }
 
     return () => {
       alive = false;
