@@ -12,21 +12,84 @@ const effectsHooks = {
 
 describe('react-async-core-hooks', () => {
   describe('useAsyncCallback', () => {
-    test('runs async callback', () => {
-      return new Promise((done) => {
+    test('runs async callback', (done) => {
+      const containerEl = document.createElement('div');
+
+      const MyComponent = () => {
+        const [state, setState] = useState('foo');
+
+        const cb = useAsyncCallback(function* () {
+          expect(containerEl.innerHTML).toEqual('foo');
+          setState(yield Promise.resolve('bar'));
+          expect(containerEl.innerHTML).toEqual('bar');
+          done();
+        }, [true]);
+
+        useEffect(cb, [true]);
+
+        return state;
+      };
+
+      ReactDOM.render(
+        <MyComponent />,
+        containerEl,
+      );
+    });
+
+    test('aborts callback on unmount', (done) => {
+      const containerEl = document.createElement('div');
+
+      const PostCallbackComponent = () => {
+        useEffect(() => {
+          done();
+        }, [true]);
+
+        return null;
+      };
+
+      const MyComponent = () => {
+        const cb = useAsyncCallback(function* () {
+          ReactDOM.render(
+            <PostCallbackComponent />,
+            containerEl,
+          );
+
+          yield Promise.resolve();
+          yield Promise.resolve();
+
+          done.fail('Not supposed to be here');
+        }, [true]);
+
+        useEffect(() => {
+          cb();
+        }, [true]);
+
+        return null;
+      };
+
+      ReactDOM.render(
+        <MyComponent />,
+        containerEl,
+      );
+    });
+  });
+
+  ['useAsyncEffect', 'useAsyncLayoutEffect'].forEach((hookName) => {
+    const useAsyncEffect = effectsHooks[hookName];
+
+    describe(hookName, () => {
+      test('runs async effect', (done) => {
         const containerEl = document.createElement('div');
 
         const MyComponent = () => {
           const [state, setState] = useState('foo');
 
-          const cb = useAsyncCallback(function* () {
+          useAsyncEffect(function* () {
             expect(containerEl.innerHTML).toEqual('foo');
             setState(yield Promise.resolve('bar'));
             expect(containerEl.innerHTML).toEqual('bar');
             done();
           }, [true]);
-
-          useEffect(cb, [true]);
 
           return state;
         };
@@ -36,38 +99,27 @@ describe('react-async-core-hooks', () => {
           containerEl,
         );
       });
-    });
 
-    test('aborts callback on unmount', () => {
-      return new Promise((done) => {
+      test('aborts effect on input change', (done) => {
         const containerEl = document.createElement('div');
 
-        const PostCallbackComponent = () => {
-          useEffect(() => {
-            done();
-          }, [true]);
-
-          return null;
-        };
-
         const MyComponent = () => {
-          const cb = useAsyncCallback(function* () {
-            ReactDOM.render(
-              <PostCallbackComponent />,
-              containerEl,
-            );
+          const [state, setState] = useState('foo');
 
-            yield Promise.resolve();
-            yield Promise.resolve();
+          useAsyncEffect(function* () {
+            if (state == 'bar') {
+              expect(containerEl.innerHTML).toEqual('bar');
+              done();
+            }
+            else {
+              expect(containerEl.innerHTML).toEqual('foo');
+              setState('bar');
+              yield Promise.resolve();
+              done.fail('Not supposed to be here');
+            }
+          }, [state]);
 
-            done.fail('Not supposed to be here');
-          }, [true]);
-
-          useEffect(() => {
-            cb();
-          }, [true]);
-
-          return null;
+          return state;
         };
 
         ReactDOM.render(
@@ -75,96 +127,34 @@ describe('react-async-core-hooks', () => {
           containerEl,
         );
       });
-    });
-  });
 
-  ['useAsyncEffect', 'useAsyncLayoutEffect'].forEach((hookName) => {
-    const useAsyncEffect = effectsHooks[hookName];
+      test('runs cleanup callback', (done) => {
+        const containerEl = document.createElement('div');
 
-    describe(hookName, () => {
-      test('runs async effect', () => {
-        return new Promise((done) => {
-          const containerEl = document.createElement('div');
+        const MyComponent = () => {
+          const [state, setState] = useState('foo');
 
-          const MyComponent = () => {
-            const [state, setState] = useState('foo');
+          useAsyncEffect(function* (onCleanup) {
+            if (state == 'bar') return;
 
-            useAsyncEffect(function* () {
-              expect(containerEl.innerHTML).toEqual('foo');
-              setState(yield Promise.resolve('bar'));
+            onCleanup(() => {
               expect(containerEl.innerHTML).toEqual('bar');
               done();
-            }, [true]);
+            });
 
-            return state;
-          };
+            expect(containerEl.innerHTML).toEqual('foo');
+            setState('bar');
+            yield Promise.resolve();
+            done.fail('Not supposed to be here');
+          }, [state]);
 
-          ReactDOM.render(
-            <MyComponent />,
-            containerEl,
-          );
-        });
-      });
+          return state;
+        };
 
-      test('aborts effect on input change', () => {
-        return new Promise((done) => {
-          const containerEl = document.createElement('div');
-
-          const MyComponent = () => {
-            const [state, setState] = useState('foo');
-
-            useAsyncEffect(function* () {
-              if (state == 'bar') {
-                expect(containerEl.innerHTML).toEqual('bar');
-                done();
-              }
-              else {
-                expect(containerEl.innerHTML).toEqual('foo');
-                setState('bar');
-                yield Promise.resolve();
-                done.fail('Not supposed to be here');
-              }
-            }, [state]);
-
-            return state;
-          };
-
-          ReactDOM.render(
-            <MyComponent />,
-            containerEl,
-          );
-        });
-      });
-
-      test('runs cleanup callback', () => {
-        return new Promise((done) => {
-          const containerEl = document.createElement('div');
-
-          const MyComponent = () => {
-            const [state, setState] = useState('foo');
-
-            useAsyncEffect(function* (onCleanup) {
-              if (state == 'bar') return;
-
-              onCleanup(() => {
-                expect(containerEl.innerHTML).toEqual('bar');
-                done();
-              });
-
-              expect(containerEl.innerHTML).toEqual('foo');
-              setState('bar');
-              yield Promise.resolve();
-              done.fail('Not supposed to be here');
-            }, [state]);
-
-            return state;
-          };
-
-          ReactDOM.render(
-            <MyComponent />,
-            containerEl,
-          );
-        });
+        ReactDOM.render(
+          <MyComponent />,
+          containerEl,
+        );
       });
     });
   });
