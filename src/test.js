@@ -121,9 +121,40 @@ describe('react-async-core-hooks', () => {
               else {
                 expect(containerEl.innerHTML).toEqual('foo');
                 setState('bar');
-                yield Promise.resolve();'';
+                yield Promise.resolve();
                 done.fail('Not supposed to be here');
               }
+            }, [state]);
+
+            return state;
+          };
+
+          ReactDOM.render(
+            <MyComponent />,
+            containerEl,
+          );
+        });
+      });
+
+      test('runs cleanup callback', () => {
+        return new Promise((done) => {
+          const containerEl = document.createElement('div');
+
+          const MyComponent = () => {
+            const [state, setState] = useState('foo');
+
+            useAsyncEffect(function* (onCleanup) {
+              if (state == 'bar') return;
+
+              onCleanup(() => {
+                expect(containerEl.innerHTML).toEqual('bar');
+                done();
+              });
+
+              expect(containerEl.innerHTML).toEqual('foo');
+              setState('bar');
+              yield Promise.resolve();
+              done.fail('Not supposed to be here');
             }, [state]);
 
             return state;
